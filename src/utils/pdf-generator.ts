@@ -18,8 +18,8 @@ export interface PDFOptions {
   };
 }
 
-// デフォルトオプション（将来のPDF生成実装用）
-const _DEFAULT_OPTIONS: PDFOptions = {
+// デフォルトオプション
+const DEFAULT_OPTIONS: PDFOptions = {
   paperSize: 'A4',
   orientation: 'portrait',
   margin: {
@@ -583,23 +583,101 @@ function escapeHTML(str: string): string {
 }
 
 /**
- * PDF生成（プレースホルダー - 実際の実装ではpuppeteerなどを使用）
+ * PDF生成（Puppeteerを使用）
  */
 export async function generatePDF(
-  _html: string,
-  _options?: Partial<PDFOptions>
+  html: string,
+  options?: Partial<PDFOptions>
 ): Promise<ApiResponse<Buffer>> {
-  // 注意: 実際のPDF生成にはpuppeteer, playwright, またはpdfkitなどのライブラリが必要
-  // ここではHTMLを返すプレースホルダー実装
+  try {
+    const puppeteer = await import('puppeteer');
+    const browser = await puppeteer.default.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
 
-  return {
-    success: false,
-    error: {
-      code: 'NOT_IMPLEMENTED',
-      message:
-        'PDF generation requires a PDF library like puppeteer or pdfkit. Use generateQuoteHTML/generateInvoiceHTML for HTML output.',
-    },
-  };
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+    const pdfBuffer = await page.pdf({
+      format: mergedOptions.paperSize,
+      landscape: mergedOptions.orientation === 'landscape',
+      margin: {
+        top: `${mergedOptions.margin.top}mm`,
+        right: `${mergedOptions.margin.right}mm`,
+        bottom: `${mergedOptions.margin.bottom}mm`,
+        left: `${mergedOptions.margin.left}mm`,
+      },
+      printBackground: true,
+    });
+
+    await browser.close();
+
+    return {
+      success: true,
+      data: Buffer.from(pdfBuffer),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'PDF_GENERATION_FAILED',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+/**
+ * 見積書PDFを生成
+ */
+export async function generateQuotePDF(
+  quote: Quote,
+  client: Client,
+  company: CompanyInfo,
+  options?: Partial<PDFOptions>
+): Promise<ApiResponse<Buffer>> {
+  const html = generateQuoteHTML(quote, client, company);
+  return generatePDF(html, options);
+}
+
+/**
+ * 請求書PDFを生成
+ */
+export async function generateInvoicePDF(
+  invoice: Invoice,
+  client: Client,
+  company: CompanyInfo,
+  options?: Partial<PDFOptions>
+): Promise<ApiResponse<Buffer>> {
+  const html = generateInvoiceHTML(invoice, client, company);
+  return generatePDF(html, options);
+}
+
+/**
+ * PDFをファイルに保存
+ */
+export async function savePDFToFile(
+  pdfBuffer: Buffer,
+  filePath: string
+): Promise<ApiResponse<void>> {
+  try {
+    const { writeFile } = await import('fs/promises');
+    await writeFile(filePath, pdfBuffer);
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'FILE_WRITE_FAILED',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+    };
+  }
 }
 
 /**

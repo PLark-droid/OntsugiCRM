@@ -3,20 +3,28 @@
     "target": "ES2022",
     "module": "ESNext",
     "lib": [
-      "ES2022"
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
     ],
-    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "."
+    "rootDir": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": [
     "src/**/*",
-    "tests/**/*"
+    "tests/**/*",
+    "scripts/**/*",
+    "vite.config.ts"
   ],
   "exclude": [
     "node_modules",
